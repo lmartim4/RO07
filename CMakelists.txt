@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.10)
+project(EKF_SLAM_Validation_No_Eigen CXX)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# No external dependencies needed!
+
+# Create library for EKF SLAM data loader (no Eigen)
+add_library(ekf_slam_data_loader_no_eigen
+    ekf_slam_data_loader_no_eigen.cpp
+    ekf_slam_data_loader_no_eigen.h
+)
+
+# Create example executable
+add_executable(example_usage_no_eigen
+    example_usage_no_eigen.cpp
+)
+
+target_link_libraries(example_usage_no_eigen 
+    ekf_slam_data_loader_no_eigen
+)
+
+# Optional: Add your actual EKF SLAM implementation
+# add_executable(your_fpga_ekf_slam
+#     your_fpga_ekf_slam.cpp
+#     ekf_slam_fpga_implementation.cpp
+# )
+# 
+# target_link_libraries(your_fpga_ekf_slam 
+#     ekf_slam_data_loader_no_eigen
+# )
+
+message(STATUS "Building Eigen-free version - suitable for FPGA implementation")
