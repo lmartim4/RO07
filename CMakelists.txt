@@ -1,35 +1,110 @@
 cmake_minimum_required(VERSION 3.10)
-project(EKF_SLAM_Validation_No_Eigen CXX)
+
+# Project name and version
+project(EKF_SLAM VERSION 1.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# No external dependencies needed!
+# Compiler flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
-# Create library for EKF SLAM data loader (no Eigen)
-add_library(ekf_slam_data_loader_no_eigen
-    ekf_slam_data_loader_no_eigen.cpp
-    ekf_slam_data_loader_no_eigen.h
+# Default to Release build if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+# Source files
+set(EKF_SLAM_SOURCES
+    ekf_slam.cpp
+    ekf_slam_dataloader.cpp
 )
 
-# Create example executable
-add_executable(example_usage_no_eigen
-    example_usage_no_eigen.cpp
+set(EKF_SLAM_HEADERS
+    ekf_slam.h
+    ekf_slam_dataloader.h
 )
 
-target_link_libraries(example_usage_no_eigen 
-    ekf_slam_data_loader_no_eigen
+# Create library for EKF SLAM (optional, but good practice)
+add_library(ekf_slam_lib STATIC
+    ${EKF_SLAM_SOURCES}
+    ${EKF_SLAM_HEADERS}
 )
 
-# Optional: Add your actual EKF SLAM implementation
-# add_executable(your_fpga_ekf_slam
-#     your_fpga_ekf_slam.cpp
-#     ekf_slam_fpga_implementation.cpp
-# )
-# 
-# target_link_libraries(your_fpga_ekf_slam 
-#     ekf_slam_data_loader_no_eigen
-# )
+# Include directories
+target_include_directories(ekf_slam_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
-message(STATUS "Building Eigen-free version - suitable for FPGA implementation")
+# Testbench executable
+add_executable(ekf_slam_testbench
+    testbench.cpp
+)
+
+# Link testbench with library
+target_link_libraries(ekf_slam_testbench
+    ekf_slam_lib
+)
+
+# Installation rules
+install(TARGETS ekf_slam_testbench
+    RUNTIME DESTINATION bin
+)
+
+install(TARGETS ekf_slam_lib
+    ARCHIVE DESTINATION lib
+)
+
+install(FILES ${EKF_SLAM_HEADERS}
+    DESTINATION include/ekf_slam
+)
+
+# Copy data files to build directory (if they exist)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ekf_slam_initial_conditions.txt")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/ekf_slam_initial_conditions.txt"
+        "${CMAKE_CURRENT_BINARY_DIR}/ekf_slam_initial_conditions.txt"
+        COPYONLY
+    )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ekf_slam_data.csv")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/ekf_slam_data.csv"
+        "${CMAKE_CURRENT_BINARY_DIR}/ekf_slam_data.csv"
+        COPYONLY
+    )
+endif()
+
+# Option to enable/disable specific features
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(ENABLE_FAST_MATH "Enable fast math optimizations" OFF)
+
+if(ENABLE_FAST_MATH)
+    target_compile_options(ekf_slam_lib PRIVATE -ffast-math)
+endif()
+
+# Print configuration
+message(STATUS "")
+message(STATUS "========== Build Configuration ==========")
+message(STATUS "Project: ${PROJECT_NAME} ${PROJECT_VERSION}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "=========================================")
+message(STATUS "")
+
+# Enable testing (optional)
+enable_testing()
+
+# Add test to run the testbench
+add_test(NAME ekf_slam_validation
+    COMMAND ekf_slam_testbench
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
