@@ -17,7 +17,30 @@ bool EKFSLAMDataLoader::loadInitialConditions(const std::string& filename) {
     
     std::string line;
     std::string current_section = "";
+    std::string prev_section = "";
     std::vector<double> temp_data;
+    
+    // Helper lambda to process completed section
+    auto processSectionData = [&](const std::string& section) {
+        if (temp_data.empty() || section.empty()) return;
+        
+        if (section == "landmarks") {
+            initial_conditions_.landmarks = temp_data;
+        } else if (section == "xest") {
+            initial_conditions_.initial_xEst = Vector(temp_data);
+        } else if (section == "pest") {
+            int size = initial_conditions_.STATE_SIZE;
+            initial_conditions_.initial_PEst = reconstructMatrix(temp_data, size);
+        } else if (section == "q") {
+            for (int i = 0; i < 4 && i < (int)temp_data.size(); i++) {
+                initial_conditions_.Q[i] = temp_data[i];
+            }
+        } else if (section == "py") {
+            for (int i = 0; i < 4 && i < (int)temp_data.size(); i++) {
+                initial_conditions_.Py[i] = temp_data[i];
+            }
+        }
+    };
     
     while (std::getline(file, line)) {
         // Skip empty lines
@@ -25,25 +48,32 @@ bool EKFSLAMDataLoader::loadInitialConditions(const std::string& filename) {
         
         // Check for section headers
         if (line.find("# Initial Conditions") != std::string::npos) {
+            processSectionData(current_section);
             current_section = "params";
+            temp_data.clear();
             continue;
         } else if (line.find("# Landmarks") != std::string::npos) {
+            processSectionData(current_section);
             current_section = "landmarks";
             temp_data.clear();
             continue;
         } else if (line.find("# Initial xEst") != std::string::npos) {
+            processSectionData(current_section);
             current_section = "xest";
             temp_data.clear();
             continue;
         } else if (line.find("# Initial PEst") != std::string::npos) {
+            processSectionData(current_section);
             current_section = "pest";
             temp_data.clear();
             continue;
         } else if (line.find("# Q matrix") != std::string::npos) {
+            processSectionData(current_section);
             current_section = "q";
             temp_data.clear();
             continue;
         } else if (line.find("# Py matrix") != std::string::npos) {
+            processSectionData(current_section);
             current_section = "py";
             temp_data.clear();
             continue;
@@ -74,32 +104,11 @@ bool EKFSLAMDataLoader::loadInitialConditions(const std::string& filename) {
             while (iss >> value) {
                 temp_data.push_back(value);
             }
-            
-            // Process complete sections
-            if (current_section == "landmarks") {
-                // Store landmarks as flattened array
-                initial_conditions_.landmarks = temp_data;
-            }
         }
     }
     
-    // Process collected data
-    if (!temp_data.empty()) {
-        if (current_section == "xest") {
-            initial_conditions_.initial_xEst = Vector(temp_data);
-        } else if (current_section == "pest") {
-            int size = initial_conditions_.STATE_SIZE;
-            initial_conditions_.initial_PEst = reconstructMatrix(temp_data, size);
-        } else if (current_section == "q") {
-            for (int i = 0; i < 4 && i < (int)temp_data.size(); i++) {
-                initial_conditions_.Q[i] = temp_data[i];
-            }
-        } else if (current_section == "py") {
-            for (int i = 0; i < 4 && i < (int)temp_data.size(); i++) {
-                initial_conditions_.Py[i] = temp_data[i];
-            }
-        }
-    }
+    // Process final section
+    processSectionData(current_section);
     
     file.close();
     return true;
@@ -113,13 +122,9 @@ bool EKFSLAMDataLoader::loadIterationData(const std::string& filename) {
     }
     
     std::string line;
-    int line_num = 0;
-    
-    // Skip header lines
-    while (std::getline(file, line)) {
-        line_num++;
-        if (line_num > 2) break; // Skip first 2 comment lines
-    }
+    // Skip first 2 header lines
+    std::getline(file, line); // Skip line 1
+    std::getline(file, line); // Skip line 2
     
     // Parse data lines
     while (std::getline(file, line)) {
