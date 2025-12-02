@@ -1,1 +1,3 @@
 build/
+xilinx_ws/
+.venv/

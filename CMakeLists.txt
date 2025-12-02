@@ -30,6 +30,19 @@ set(EKF_SLAM_HEADERS
     ekf_slam_dataloader.h
 )
 
+# Embedded data loader sources
+set(EKF_SLAM_EMBEDDED_SOURCES
+    ekf_slam.cpp
+    ekf_slam_dataloader_embedded.cpp
+)
+
+set(EKF_SLAM_EMBEDDED_HEADERS
+    ekf_slam.h
+    ekf_slam_dataloader.h
+    ekf_slam_dataloader_embedded.h
+    ekf_slam_data.h
+)
+
 # HLS source files
 set(EKF_SLAM_HLS_SOURCES
     ekf_slam_hls.cpp
@@ -84,8 +97,19 @@ target_link_libraries(ekf_slam_hls_testbench
     ekf_slam_hls_lib
 )
 
+# Embedded data testbench executable (no CSV file needed)
+add_executable(ekf_slam_testbench_embedded
+    testbench_embedded.cpp
+    ${EKF_SLAM_EMBEDDED_SOURCES}
+)
+
+# Include directories for embedded testbench
+target_include_directories(ekf_slam_testbench_embedded PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 # Installation rules
-install(TARGETS ekf_slam_testbench ekf_slam_hls_testbench
+install(TARGETS ekf_slam_testbench ekf_slam_hls_testbench ekf_slam_testbench_embedded
     RUNTIME DESTINATION bin
 )
 
