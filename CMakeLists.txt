@@ -30,6 +30,17 @@ set(EKF_SLAM_HEADERS
     ekf_slam_dataloader.h
 )
 
+# HLS source files
+set(EKF_SLAM_HLS_SOURCES
+    ekf_slam_hls.cpp
+    ekf_slam_hls_wrapper.cpp
+)
+
+set(EKF_SLAM_HLS_HEADERS
+    ekf_slam_hls.h
+    ekf_slam_hls_wrapper.h
+)
+
 # Create library for EKF SLAM (optional, but good practice)
 add_library(ekf_slam_lib STATIC
     ${EKF_SLAM_SOURCES}
@@ -41,7 +52,19 @@ target_include_directories(ekf_slam_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# Testbench executable
+# Create library for HLS version
+add_library(ekf_slam_hls_lib STATIC
+    ${EKF_SLAM_SOURCES}
+    ${EKF_SLAM_HEADERS}
+    ${EKF_SLAM_HLS_SOURCES}
+    ${EKF_SLAM_HLS_HEADERS}
+)
+
+target_include_directories(ekf_slam_hls_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Testbench executable (original)
 add_executable(ekf_slam_testbench
     testbench.cpp
 )
@@ -51,16 +74,26 @@ target_link_libraries(ekf_slam_testbench
     ekf_slam_lib
 )
 
+# HLS Testbench executable
+add_executable(ekf_slam_hls_testbench
+    testbench_hls.cpp
+)
+
+# Link HLS testbench with HLS library
+target_link_libraries(ekf_slam_hls_testbench
+    ekf_slam_hls_lib
+)
+
 # Installation rules
-install(TARGETS ekf_slam_testbench
+install(TARGETS ekf_slam_testbench ekf_slam_hls_testbench
     RUNTIME DESTINATION bin
 )
 
-install(TARGETS ekf_slam_lib
+install(TARGETS ekf_slam_lib ekf_slam_hls_lib
     ARCHIVE DESTINATION lib
 )
 
-install(FILES ${EKF_SLAM_HEADERS}
+install(FILES ${EKF_SLAM_HEADERS} ${EKF_SLAM_HLS_HEADERS}
     DESTINATION include/ekf_slam
 )
 
