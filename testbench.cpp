@@ -62,6 +62,54 @@ Matrix matrixSubtract(const Matrix& a, const Matrix& b) {
     return result;
 }
 
+// Compute Mahalanobis distance: (dx)^T * P^{-1} * (dx)
+double mahalanobisDistance(const Vector& diff, const Matrix& P) {
+    Matrix Pinv = EKFSLAM::matInv(P);  // call static function
+    Vector temp = EKFSLAM::matVecMul(Pinv, diff);
+    
+    double sum = 0.0;
+    for (size_t i = 0; i < diff.size(); i++)
+        sum += diff(i) * temp(i);
+
+    return sum;
+}
+
+// Compute robot pose error separately
+void computePoseError(const Vector& x_cpp, const Vector& x_py,
+                      double& pos_err, double& theta_err) {
+    pos_err = std::hypot(x_cpp(0) - x_py(0), x_cpp(1) - x_py(1));
+    theta_err = std::fabs(EKFSLAM::pi2pi(x_cpp(2) - x_py(2)));
+}
+
+// Compute landmark RMSE
+double computeLandmarkRMSE(const Vector& x_cpp, const Vector& x_py) {
+    size_t N = x_cpp.size();
+    if (N <= 3) return 0.0;
+
+    double sum = 0.0;
+    size_t LM = (N - 3) / 2;
+
+    for (size_t i = 0; i < LM; i++) {
+        size_t idx = 3 + 2*i;
+        double dx = x_cpp(idx) - x_py(idx);
+        double dy = x_cpp(idx+1) - x_py(idx+1);
+        sum += dx*dx + dy*dy;
+    }
+    return std::sqrt(sum / LM);
+}
+
+// Covariance symmetry error: max |P - P^T|
+double covarianceAsymmetry(const Matrix& P) {
+    double max_err = 0.0;
+    for (size_t i = 0; i < P.rows(); i++) {
+        for (size_t j = 0; j < P.cols(); j++) {
+            double diff = std::fabs(P(i,j) - P(j,i));
+            if (diff > max_err) max_err = diff;
+        }
+    }
+    return max_err;
+}
+
 int main(int argc, char** argv) {
     std::cout << "\n========================================" << std::endl;
     std::cout << "EKF SLAM C++ Implementation Testbench" << std::endl;
@@ -127,27 +175,27 @@ int main(int argc, char** argv) {
         double error_before = vectorNorm(diff_before);
         
         // Check for divergence before update
-        if (error_before > DIVERGENCE_STATE_THRESHOLD) {
-            std::cout << "\n⚠ DIVERGENCE DETECTED at iteration " << iter->iteration << std::endl;
-            std::cout << "State before update differs by " << std::scientific << error_before << std::endl;
-            std::cout << "\nC++ state (first 10): [";
-            for (size_t j = 0; j < std::min((size_t)10, xEst_before.size()); j++) {
-                std::cout << std::fixed << std::setprecision(6) << xEst_before(j);
-                if (j < std::min((size_t)10, xEst_before.size()) - 1) std::cout << ", ";
-            }
-            std::cout << "]" << std::endl;
+        // if (error_before > DIVERGENCE_STATE_THRESHOLD) {
+        //     std::cout << "\n⚠ DIVERGENCE DETECTED at iteration " << iter->iteration << std::endl;
+        //     std::cout << "State before update differs by " << std::scientific << error_before << std::endl;
+        //     std::cout << "\nC++ state (first 10): [";
+        //     for (size_t j = 0; j < std::min((size_t)10, xEst_before.size()); j++) {
+        //         std::cout << std::fixed << std::setprecision(6) << xEst_before(j);
+        //         if (j < std::min((size_t)10, xEst_before.size()) - 1) std::cout << ", ";
+        //     }
+        //     std::cout << "]" << std::endl;
             
-            std::cout << "Python state (first 10): [";
-            for (size_t j = 0; j < std::min((size_t)10, iter->xEst_before.size()); j++) {
-                std::cout << std::fixed << std::setprecision(6) << iter->xEst_before(j);
-                if (j < std::min((size_t)10, iter->xEst_before.size()) - 1) std::cout << ", ";
-            }
-            std::cout << "]" << std::endl;
+        //     std::cout << "Python state (first 10): [";
+        //     for (size_t j = 0; j < std::min((size_t)10, iter->xEst_before.size()); j++) {
+        //         std::cout << std::fixed << std::setprecision(6) << iter->xEst_before(j);
+        //         if (j < std::min((size_t)10, iter->xEst_before.size()) - 1) std::cout << ", ";
+        //     }
+        //     std::cout << "]" << std::endl;
             
-            diverged = true;
-            divergence_iteration = i;
-            break;
-        }
+        //     diverged = true;
+        //     divergence_iteration = i;
+        //     break;
+        // }
         
         max_state_error = std::max(max_state_error, error_before);
         
@@ -172,31 +220,64 @@ int main(int argc, char** argv) {
         
         max_state_error = std::max(max_state_error, error_after);
         max_covariance_error = std::max(max_covariance_error, cov_error);
+
+        // === Enhanced divergence metrics ===
+
+        // 1. Mahalanobis distance D^2
+        double D2 = mahalanobisDistance(diff_after, iter->PEst_after);
+
+        // 2. Pose error
+        double pos_err, theta_err;
+        computePoseError(xEst_after, iter->xEst_after, pos_err, theta_err);
+
+        // 3. Landmark RMSE
+        double lm_rmse = computeLandmarkRMSE(xEst_after, iter->xEst_after);
+
+        // 4. Covariance asymmetry
+        double asym = covarianceAsymmetry(PEst_after);
+
+        // Print every 100 iterations
+        if ((i + 1) % 100 == 0 || D2 > 50 || i == num_iterations - 1) {
+            std::cout << "  [Extra metrics] D2=" << D2
+                    << ", pos_err=" << pos_err
+                    << ", theta_err=" << theta_err
+                    << ", lm_rmse=" << lm_rmse
+                    << ", asym=" << asym << std::endl;
+        }
+
+        // bool hard_diverge = (
+        //     error_after > DIVERGENCE_STATE_THRESHOLD ||
+        //     cov_error > DIVERGENCE_COV_THRESHOLD ||
+        //     D2 > 200 ||             // Mahalanobis blow-up
+        //     asym > 1e-3 ||          // Covariance no longer symmetric
+        //     pos_err > 2.0 ||        // Robot position jumped
+        //     theta_err > 0.3         // Angle exploded
+        // );
         
         // Check for divergence after update
-        if (error_after > DIVERGENCE_STATE_THRESHOLD || cov_error > DIVERGENCE_COV_THRESHOLD) {
-            std::cout << "\n⚠ DIVERGENCE DETECTED at iteration " << iter->iteration << std::endl;
-            std::cout << "State error: " << std::scientific << error_after << std::endl;
-            std::cout << "Covariance error: " << cov_error << std::endl;
+        // if (hard_diverge) {
+        //     std::cout << "\n⚠ DIVERGENCE DETECTED at iteration " << iter->iteration << std::endl;
+        //     std::cout << "State error: " << std::scientific << error_after << std::endl;
+        //     std::cout << "Covariance error: " << cov_error << std::endl;
             
-            std::cout << "\nC++ state after (first 10): [";
-            for (size_t j = 0; j < std::min((size_t)10, xEst_after.size()); j++) {
-                std::cout << std::fixed << std::setprecision(6) << xEst_after(j);
-                if (j < std::min((size_t)10, xEst_after.size()) - 1) std::cout << ", ";
-            }
-            std::cout << "]" << std::endl;
+        //     std::cout << "\nC++ state after (first 10): [";
+        //     for (size_t j = 0; j < std::min((size_t)10, xEst_after.size()); j++) {
+        //         std::cout << std::fixed << std::setprecision(6) << xEst_after(j);
+        //         if (j < std::min((size_t)10, xEst_after.size()) - 1) std::cout << ", ";
+        //     }
+        //     std::cout << "]" << std::endl;
             
-            std::cout << "Python state after (first 10): [";
-            for (size_t j = 0; j < std::min((size_t)10, iter->xEst_after.size()); j++) {
-                std::cout << std::fixed << std::setprecision(6) << iter->xEst_after(j);
-                if (j < std::min((size_t)10, iter->xEst_after.size()) - 1) std::cout << ", ";
-            }
-            std::cout << "]" << std::endl;
+        //     std::cout << "Python state after (first 10): [";
+        //     for (size_t j = 0; j < std::min((size_t)10, iter->xEst_after.size()); j++) {
+        //         std::cout << std::fixed << std::setprecision(6) << iter->xEst_after(j);
+        //         if (j < std::min((size_t)10, iter->xEst_after.size()) - 1) std::cout << ", ";
+        //     }
+        //     std::cout << "]" << std::endl;
             
-            diverged = true;
-            divergence_iteration = i;
-            break;
-        }
+        //     diverged = true;
+        //     divergence_iteration = i;
+        //     break;
+        // }
         
         // Track warnings but continue
         if (error_after > WARNING_THRESHOLD || cov_error > WARNING_THRESHOLD) {

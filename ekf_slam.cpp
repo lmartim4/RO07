@@ -49,7 +49,7 @@ int EKFSLAM::calcNumLandmarks(const Vector& x) const {
     return (x.size() - STATE_SIZE_) / LM_SIZE_;
 }
 
-double EKFSLAM::pi2pi(double angle) const {
+double EKFSLAM::pi2pi(double angle) {
     return std::fmod(angle + M_PI, 2.0 * M_PI) - M_PI;
 }
 
@@ -491,7 +491,7 @@ Matrix EKFSLAM::matSub(const Matrix& A, const Matrix& B) const {
     return C;
 }
 
-Vector EKFSLAM::matVecMul(const Matrix& A, const Vector& x) const {
+Vector EKFSLAM::matVecMul(const Matrix& A, const Vector& x) {
     if (A.cols() != x.size()) {
         std::cerr << "Matrix-vector dimension mismatch" << std::endl;
         return Vector();
@@ -521,7 +521,7 @@ Vector EKFSLAM::vecAdd(const Vector& a, const Vector& b) const {
     return c;
 }
 
-Matrix EKFSLAM::matInv2x2(const Matrix& A) const {
+Matrix EKFSLAM::matInv2x2(const Matrix& A) {
     if (A.rows() != 2 || A.cols() != 2) {
         std::cerr << "matInv2x2 requires 2x2 matrix" << std::endl;
         return Matrix();
@@ -543,7 +543,7 @@ Matrix EKFSLAM::matInv2x2(const Matrix& A) const {
     return inv;
 }
 
-Matrix EKFSLAM::matInv(const Matrix& A) const {
+Matrix EKFSLAM::matInv(const Matrix& A) {
     int n = A.rows();
     if (n != (int)A.cols()) {
         std::cerr << "Matrix must be square for inversion" << std::endl;
