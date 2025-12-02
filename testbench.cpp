@@ -5,13 +5,6 @@
 #include <cmath>
 #include <chrono>
 
-/**
- * Testbench for EKF SLAM implementation
- * Loads data from CSV and validates against Python reference implementation
- * Stops at first significant divergence between C++ and Python results
- */
-
-// Helper function to compute vector norm
 double vectorNorm(const Vector& v) {
     double sum = 0.0;
     for (size_t i = 0; i < v.size(); i++) {
@@ -20,7 +13,6 @@ double vectorNorm(const Vector& v) {
     return std::sqrt(sum);
 }
 
-// Helper function to compute matrix Frobenius norm
 double matrixNorm(const Matrix& m) {
     double sum = 0.0;
     for (size_t i = 0; i < m.rows(); i++) {
@@ -32,7 +24,6 @@ double matrixNorm(const Matrix& m) {
     return std::sqrt(sum);
 }
 
-// Helper function to subtract vectors
 Vector vectorSubtract(const Vector& a, const Vector& b) {
     if (a.size() != b.size()) {
         std::cerr << "Error: Vector size mismatch" << std::endl;
@@ -46,7 +37,6 @@ Vector vectorSubtract(const Vector& a, const Vector& b) {
     return result;
 }
 
-// Helper function to subtract matrices
 Matrix matrixSubtract(const Matrix& a, const Matrix& b) {
     if (a.rows() != b.rows() || a.cols() != b.cols()) {
         std::cerr << "Error: Matrix size mismatch" << std::endl;
@@ -62,7 +52,7 @@ Matrix matrixSubtract(const Matrix& a, const Matrix& b) {
     return result;
 }
 
-int main(int argc, char** argv) {
+int main() {
     std::cout << "\n========================================" << std::endl;
     std::cout << "EKF SLAM C++ Implementation Testbench" << std::endl;
     std::cout << "========================================\n" << std::endl;
@@ -84,7 +74,6 @@ int main(int argc, char** argv) {
     
     loader.printSummary();
     
-    // Initialize EKF SLAM
     const EKFSLAMInitialConditions& init = loader.getInitialConditions();
     EKFSLAM ekf;
     ekf.initialize(init);
@@ -92,7 +81,6 @@ int main(int argc, char** argv) {
     std::cout << "\n=== Initial State ===" << std::endl;
     ekf.printState();
     
-    // Validation statistics
     size_t num_iterations = loader.getNumIterations();
     double max_state_error = 0.0;
     double max_covariance_error = 0.0;
@@ -100,7 +88,6 @@ int main(int argc, char** argv) {
     double total_cpp_time = 0.0;
     double total_py_time = 0.0;
     
-    // Divergence detection thresholds
     const double DIVERGENCE_STATE_THRESHOLD = 0.1;  // Stop if state error > 0.1
     const double DIVERGENCE_COV_THRESHOLD = 1.0;    // Stop if covariance error > 1.0
     const double WARNING_THRESHOLD = 1e-3;          // Report warnings above this

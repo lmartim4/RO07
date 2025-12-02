@@ -82,8 +82,7 @@ void EKFSLAM::jacobMotion(const Vector& x, const double u[2], Matrix& A, Matrix&
     B(2, 1) = DT_;
 }
 
-void EKFSLAM::calcLandmarkPosition(const Vector& x, const Observation& obs, 
-                                   double& lm_x, double& lm_y) const {
+void EKFSLAM::calcLandmarkPosition(const Vector& x, const Observation& obs, double& lm_x, double& lm_y) const {
     lm_x = x(0) + obs.range * std::cos(x(2) + obs.bearing);
     lm_y = x(1) + obs.range * std::sin(x(2) + obs.bearing);
 }
